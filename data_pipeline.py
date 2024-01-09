@@ -1,6 +1,8 @@
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler
 import pandas as pd
+import numpy as np
 
 
 class StoreMeger(BaseEstimator, TransformerMixin):
@@ -47,22 +49,9 @@ class OilMerger(BaseEstimator, TransformerMixin):
         merged_oil_df = pd.merge(X, filled_oil_df, on=['date', 'date'], how='left')
 
         return merged_oil_df.bfill()
-
+    
 
 class DateTransformer(BaseEstimator, TransformerMixin):
-
-    def fit(self, X, y= None):
-        return self
-    
-    def transform(self, X):
-        X['is_weekend'] = pd.to_datetime(X['date']).dt.dayofweek.apply(lambda x: 1 if x >= 5 else 0)
-        X['month'] = pd.to_datetime(X['date']).dt.month
-        X['date'] = pd.to_datetime(X['date'])
-        X['encoded_date'] = (X['date'] - X['date'].min()).dt.days + 1
-        return X.drop(['date'], axis=1)
-    
-
-class AlternativeDateTransformer(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y= None):
         return self
@@ -93,8 +82,8 @@ class OneHotEncoder(BaseEstimator, TransformerMixin):
         return pd.get_dummies(X, columns=['family'])
     
 
-def cap_sales(df):
-    df.sales = df.sales.map(lambda x: x if x < 20000 else 20000)
+def cap_sales(df, cap = 20000):
+    df.sales = df.sales.map(lambda x: x if x < cap else cap)
     return df
 
 
@@ -103,16 +92,6 @@ data_transform_pipeline = Pipeline([
      ('merge_holidays', HolidayMerger()),
     ('merge_oil_prices', OilMerger()),
     ('transform_dates', DateTransformer()),
-    ('drop_id', IdDropper()),
-    ('one_hot_encoding', OneHotEncoder())
-])
-
-
-data_transform_pipeline_2 = Pipeline([
-     ('merge_stores', StoreMeger()),
-     ('merge_holidays', HolidayMerger()),
-    ('merge_oil_prices', OilMerger()),
-    ('alternative_transform_dates', AlternativeDateTransformer()),
     ('drop_id', IdDropper()),
     ('one_hot_encoding', OneHotEncoder())
 ])
