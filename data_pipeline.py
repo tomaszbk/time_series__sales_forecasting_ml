@@ -59,8 +59,9 @@ class DateTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         X['date'] = pd.to_datetime(X['date'])
         X['month'] = X['date'].dt.month
-        X['day'] = X['date'].dt.day
+        # X['day'] = X['date'].dt.day
         X['year'] = X['date'].dt.year
+        X['day_of_week'] = X['date'].dt.dayofweek
         return X.drop(['date'], axis=1)
     
 
@@ -93,5 +94,6 @@ data_transform_pipeline = Pipeline([
     ('merge_oil_prices', OilMerger()),
     ('transform_dates', DateTransformer()),
     ('drop_id', IdDropper()),
-    ('one_hot_encoding', OneHotEncoder())
+    ('one_hot_encoding', OneHotEncoder()),
+    # ('scale', StandardScaler())
 ])
