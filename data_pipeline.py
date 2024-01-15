@@ -1,6 +1,6 @@
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import pandas as pd
 import numpy as np
 
@@ -83,9 +83,8 @@ class OneHotEncoder(BaseEstimator, TransformerMixin):
         return pd.get_dummies(X, columns=['family'])
     
 
-def cap_sales(df, cap = 20000):
-    df.sales = df.sales.map(lambda x: x if x < cap else cap)
-    return df
+def cap_sales(s, cap = 20000):
+    return s.map(lambda x: x if x < cap else cap)
 
 
 data_transform_pipeline = Pipeline([
@@ -95,5 +94,5 @@ data_transform_pipeline = Pipeline([
     ('transform_dates', DateTransformer()),
     ('drop_id', IdDropper()),
     ('one_hot_encoding', OneHotEncoder()),
-    # ('scale', StandardScaler())
+    ('min_max_scale', MinMaxScaler())
 ])
