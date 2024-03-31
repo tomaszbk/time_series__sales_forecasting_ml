@@ -102,7 +102,7 @@ class ColumnDropper(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         X = X.drop(["id"], axis=1)
-        X = X.drop(["date"], axis=1)
+        # X = X.drop(["date"], axis=1)
         return X
 
 
@@ -111,65 +111,71 @@ class OneHotEncoder(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        return pd.get_dummies(
+        family = X["family"]
+        X = pd.get_dummies(
             X, columns=["family", "city", "state", "type"], drop_first=True
         )
+        X["family"] = family
+        return X
 
 
-class LagTransformer(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None):
-        return self
-
-    def add_lagged_features(self, group, lags):
-        for lag in lags:
-            group[f"lagged_sales_{lag}"] = group["sales"].shift(lag)
-        return group.reset_index(drop=True)
-
-    def add_rolling_mean(self, group, window_sizes):
-        for window_size in window_sizes:
-            group[f"rolling_mean_{window_size}_days"] = (
-                group["sales"].rolling(window_size).mean()
-            )
-        return group
-
-    def transform(self, X):
-        # Lagging
-        grouped_data = X.groupby(["store_nbr", "family"]).apply(
-            self.add_lagged_features, lags=[1, 2]
-        )
-        grouped_data.reset_index(drop=True, inplace=True)
-        sales_data = pd.merge(
-            X,
-            grouped_data[
-                ["store_nbr", "family", "date", "lagged_sales_1", "lagged_sales_2"]
-            ],
-            on=["store_nbr", "family", "date"],
-        )
-
-        # Rolling Window Statistics
-        grouped_data = sales_data.groupby(["store_nbr", "family"]).apply(
-            self.add_rolling_mean, window_sizes=[14, 28]
-        )
-        grouped_data.reset_index(drop=True, inplace=True)
-        sales_data = pd.merge(
-            sales_data,
-            grouped_data[
-                [
-                    "store_nbr",
-                    "family",
-                    "date",
-                    "rolling_mean_14_days",
-                    "rolling_mean_28_days",
-                ]
-            ],
-            on=["store_nbr", "family", "date"],
-        )
-
-        return sales_data[sales_data["date"] > "2013-01-28"]
-
-
-def cap_sales(s, cap=20000):
+def cap_sales(s, cap=10000):
     return s.map(lambda x: x if x < cap else cap)
+
+
+def add_lagged_features(group, lags):
+    for lag in lags:
+        group[f"lagged_sales_{lag}"] = group["sales"].shift(lag)
+    return group.reset_index(drop=True)
+
+
+def add_rolling_mean(group, window_sizes):
+    for window_size in window_sizes:
+        group[f"rolling_mean_{window_size}_days"] = (
+            group["sales"].rolling(window_size).mean()
+        )
+    return group
+
+
+def update_time_features(data, full_data=None):
+    # Lagged Features
+    grouped_data = data.groupby(["store_nbr", "family"]).apply(
+        add_lagged_features, lags=[1, 2]
+    )
+    grouped_data.reset_index(drop=True, inplace=True)
+    updated_data = pd.merge(
+        data,
+        grouped_data[
+            ["store_nbr", "family", "date", "lagged_sales_1", "lagged_sales_2"]
+        ],
+        on=["store_nbr", "family", "date"],
+    )
+
+    # Rolling Window Statistics
+    grouped_data = updated_data.groupby(["store_nbr", "family"]).apply(
+        add_rolling_mean, window_sizes=[14, 28]
+    )
+    grouped_data.reset_index(drop=True, inplace=True)
+    updated_data = pd.merge(
+        updated_data,
+        grouped_data[
+            [
+                "store_nbr",
+                "family",
+                "date",
+                "rolling_mean_14_days",
+                "rolling_mean_28_days",
+            ]
+        ],
+        on=["store_nbr", "family", "date"],
+    )
+    if full_data is not None:
+        updated_data = pd.merge(
+            full_data,
+            updated_data,
+            on=["store_nbr", "family", "date"],
+        )
+    return updated_data
 
 
 data_transform_pipeline = Pipeline(
@@ -178,9 +184,8 @@ data_transform_pipeline = Pipeline(
         ("merge_stores", StoreMeger()),
         ("merge_holidays", HolidayMerger()),
         ("merge_oil_prices", OilMerger()),
-        ("lag_sales", LagTransformer()),
         ("one_hot_encoding", OneHotEncoder()),
         ("column_dropper", ColumnDropper()),
-        ("min_max_scale", MinMaxScaler()),
+        # ("min_max_scale", MinMaxScaler()),
     ]
 )
