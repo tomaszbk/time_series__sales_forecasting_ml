@@ -3,3 +3,4 @@ mlartifacts/
 mlruns/
 models/
 __pycache__
+data/
